@@ -1,0 +1,46 @@
+# No CI trigger — this pipeline only runs on schedule or manually
+trigger: none
+
+schedules:
+  - cron: '0 6 * * 2,5'   # Tuesday and Friday at 06:00 UTC
+    displayName: 'Selenium suite — Tue & Fri'
+    branches:
+      include:
+        - master
+    always: true            # run even if no new commits since last run
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  # 1. Download the latest successful build artifact
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: 'specific'
+      project: '$(System.TeamProjectId)'
+      definition: '<BUILD_PIPELINE_ID>'   # ← replace with the numeric ID of your build pipeline
+      buildVersionToDownload: 'latest'
+      artifactName: 'drop'
+      targetPath: '$(Pipeline.Workspace)/drop'
+    displayName: 'Download latest build artifact'
+
+  # 2. Verify Chrome & ChromeDriver on the agent
+  - script: |
+      google-chrome --version
+      chromedriver --version
+    displayName: 'Check browser versions'
+
+  # 3. Run the test suite
+  - script: |
+      dotnet test $(Pipeline.Workspace)/drop/**/*.Tests.dll \
+        --logger trx \
+        --results-directory $(Agent.TempDirectory)/TestResults
+    displayName: 'Run Selenium Tests'
+
+  # 4. Always publish results, even on failure
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: 'VSTest'
+      testResultsFiles: '$(Agent.TempDirectory)/TestResults/**/*.trx'
+      testRunTitle: 'Scheduled Selenium Suite'

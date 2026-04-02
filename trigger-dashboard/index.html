@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Suite Runner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e1117;
+    --surface: #161b22;
+    --surface-hover: #1c222b;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #7d8590;
+    --accent: #58a6ff;
+    --accent-glow: rgba(88, 166, 255, 0.15);
+    --green: #3fb950;
+    --green-glow: rgba(63, 185, 80, 0.12);
+    --red: #f85149;
+    --red-glow: rgba(248, 81, 73, 0.12);
+    --yellow: #d29922;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+  }
+
+  .logo-mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--accent), #1f6feb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 0 40px var(--accent-glow), 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .logo-mark svg { width: 28px; height: 28px; fill: #fff; }
+
+  h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 2.5rem;
+    line-height: 1.5;
+  }
+
+  /* ---------- Big trigger button ---------- */
+  .trigger-btn {
+    position: relative;
+    width: 100%;
+    padding: 1.1rem 2rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #fff;
+    background: linear-gradient(135deg, #238636, #2ea043);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 30px var(--green-glow), 0 2px 12px rgba(0,0,0,0.3);
+  }
+
+  .trigger-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 0 50px rgba(63,185,80,0.25), 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .trigger-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .trigger-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .trigger-btn.running {
+    background: linear-gradient(135deg, #1a5a28, #1a6b30);
+    animation: pulse-border 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 20px var(--green-glow); }
+    50% { box-shadow: 0 0 40px rgba(63,185,80,0.3); }
+  }
+
+  .btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2.5px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Status card ---------- */
+  .status-card {
+    margin-top: 1.5rem;
+    padding: 1rem 1.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-align: left;
+    animation: fadeUp 0.3s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .status-card.success { border-color: rgba(63,185,80,0.4); background: rgba(63,185,80,0.06); }
+  .status-card.error { border-color: rgba(248,81,73,0.4); background: rgba(248,81,73,0.06); }
+
+  .status-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+
+  .status-msg {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  .status-msg a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .status-msg a:hover { text-decoration: underline; }
+
+  /* ---------- Settings panel ---------- */
+  .settings-toggle {
+    margin-top: 2.5rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: color 0.2s;
+  }
+
+  .settings-toggle:hover { color: var(--text); }
+
+  .settings-toggle .chevron {
+    transition: transform 0.2s;
+    font-size: 0.7rem;
+  }
+
+  .settings-toggle .chevron.open { transform: rotate(180deg); }
+
+  .settings-panel {
+    margin-top: 1rem;
+    padding: 1.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    text-align: left;
+    animation: fadeUp 0.3s ease;
+  }
+
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+
+  .field label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.35rem;
+  }
+
+  .field input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus { border-color: var(--accent); }
+
+  .field input::placeholder { color: #484f58; }
+
+  .field .hint {
+    font-size: 0.75rem;
+    color: #484f58;
+    margin-top: 0.3rem;
+  }
+
+  .save-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 0.65rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .save-btn:hover { opacity: 0.85; }
+
+  .saved-toast {
+    color: var(--green);
+    font-size: 0.85rem;
+    margin-top: 0.6rem;
+    animation: fadeUp 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo-mark">
+    <svg viewBox="0 0 24 24"><path d="M3 3h8v2H5v14h14v-6h2v8H3V3zm13 0h5v5h-2V5.41l-7.3 7.3-1.41-1.42L17.59 4H16V3z" fill-rule="evenodd"/></svg>
+  </div>
+  <h1>Test Suite Runner</h1>
+  <p class="subtitle">Trigger the Selenium test suite against the latest build. Results will appear in Azure DevOps.</p>
+
+  <button class="trigger-btn" id="triggerBtn" onclick="runPipeline()">
+    <span class="btn-content" id="btnContent">
+      ▶&nbsp; Run Test Suite
+    </span>
+  </button>
+
+  <div id="statusArea"></div>
+
+  <button class="settings-toggle" onclick="toggleSettings()">
+    ⚙ Configuration <span class="chevron" id="chevron">▼</span>
+  </button>
+
+  <div id="settingsPanel" style="display:none;"></div>
+</div>
+
+<script>
+  // ── State ──
+  let settingsOpen = false;
+
+  // ── Load saved config from localStorage ──
+  function getConfig() {
+    return {
+      org:        localStorage.getItem('ado_org') || '',
+      project:    localStorage.getItem('ado_project') || '',
+      pipelineId: localStorage.getItem('ado_pipeline_id') || '',
+      pat:        localStorage.getItem('ado_pat') || '',
+      branch:     localStorage.getItem('ado_branch') || 'master',
+    };
+  }
+
+  function saveConfig(cfg) {
+    localStorage.setItem('ado_org', cfg.org);
+    localStorage.setItem('ado_project', cfg.project);
+    localStorage.setItem('ado_pipeline_id', cfg.pipelineId);
+    localStorage.setItem('ado_pat', cfg.pat);
+    localStorage.setItem('ado_branch', cfg.branch);
+  }
+
+  // ── Settings panel ──
+  function toggleSettings() {
+    settingsOpen = !settingsOpen;
+    const panel = document.getElementById('settingsPanel');
+    const chevron = document.getElementById('chevron');
+    chevron.className = settingsOpen ? 'chevron open' : 'chevron';
+
+    if (!settingsOpen) {
+      panel.style.display = 'none';
+      return;
+    }
+
+    const cfg = getConfig();
+    panel.style.display = 'block';
+    panel.innerHTML = `
+      <div class="settings-panel">
+        <div class="field">
+          <label>Organization</label>
+          <input id="cfgOrg" value="${cfg.org}" placeholder="my-org" />
+          <div class="hint">The name in dev.azure.com/{org}</div>
+        </div>
+        <div class="field">
+          <label>Project</label>
+          <input id="cfgProject" value="${cfg.project}" placeholder="MyProject" />
+        </div>
+        <div class="field">
+          <label>Pipeline ID</label>
+          <input id="cfgPipelineId" value="${cfg.pipelineId}" placeholder="42" />
+          <div class="hint">Numeric ID from the pipeline URL</div>
+        </div>
+        <div class="field">
+          <label>Branch</label>
+          <input id="cfgBranch" value="${cfg.branch}" placeholder="master" />
+        </div>
+        <div class="field">
+          <label>Personal Access Token</label>
+          <input id="cfgPat" type="password" value="${cfg.pat}" placeholder="paste your PAT here" />
+          <div class="hint">Needs Build → Read & Execute permission</div>
+        </div>
+        <button class="save-btn" onclick="handleSave()">Save Settings</button>
+        <div id="saveConfirm"></div>
+      </div>
+    `;
+  }
+
+  function handleSave() {
+    saveConfig({
+      org:        document.getElementById('cfgOrg').value.trim(),
+      project:    document.getElementById('cfgProject').value.trim(),
+      pipelineId: document.getElementById('cfgPipelineId').value.trim(),
+      pat:        document.getElementById('cfgPat').value.trim(),
+      branch:     document.getElementById('cfgBranch').value.trim() || 'master',
+    });
+    document.getElementById('saveConfirm').innerHTML = '<div class="saved-toast">✓ Saved</div>';
+    setTimeout(() => {
+      const el = document.getElementById('saveConfirm');
+      if (el) el.innerHTML = '';
+    }, 2000);
+  }
+
+  // ── Trigger pipeline ──
+  async function runPipeline() {
+    const cfg = getConfig();
+
+    if (!cfg.org || !cfg.project || !cfg.pipelineId || !cfg.pat) {
+      showStatus('error', 'Please fill in the configuration below first.');
+      if (!settingsOpen) toggleSettings();
+      return;
+    }
+
+    const btn = document.getElementById('triggerBtn');
+    const btnContent = document.getElementById('btnContent');
+    btn.disabled = true;
+    btn.classList.add('running');
+    btnContent.innerHTML = '<div class="spinner"></div> Triggering…';
+    showStatus('', 'Sending request to Azure DevOps…');
+
+    try {
+      const url = `https://dev.azure.com/${encodeURIComponent(cfg.org)}/${encodeURIComponent(cfg.project)}/_apis/pipelines/${cfg.pipelineId}/runs?api-version=7.1`;
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Basic ' + btoa(':' + cfg.pat),
+        },
+        body: JSON.stringify({
+          resources: {
+            repositories: {
+              self: { refName: `refs/heads/${cfg.branch}` }
+            }
+          }
+        }),
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${errText.substring(0, 200)}`);
+      }
+
+      const data = await resp.json();
+      const runUrl = data._links?.web?.href
+        || `https://dev.azure.com/${cfg.org}/${cfg.project}/_build/results?buildId=${data.id}`;
+
+      showStatus('success', `Pipeline triggered! Run #${data.id}<br><a href="${runUrl}" target="_blank" rel="noopener">Open in Azure DevOps →</a>`);
+
+    } catch (err) {
+      showStatus('error', `Failed to trigger: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('running');
+      btnContent.innerHTML = '▶&nbsp; Run Test Suite';
+    }
+  }
+
+  function showStatus(type, msg) {
+    const area = document.getElementById('statusArea');
+    const cls = type ? ` ${type}` : '';
+    area.innerHTML = `
+      <div class="status-card${cls}">
+        <div class="status-label">${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Status'}</div>
+        <div class="status-msg">${msg}</div>
+      </div>
+    `;
+  }
+</script>
+
+</body>
+</html>
