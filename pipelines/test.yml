@@ -10,7 +10,7 @@ schedules:
     always: true            # run even if no new commits since last run
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'windows-latest'   # VSTest@3 requires a Windows agent
 
 steps:
   # 1. Download the latest successful build artifact
@@ -21,26 +21,32 @@ steps:
       definition: '<BUILD_PIPELINE_ID>'   # ← replace with the numeric ID of your build pipeline
       buildVersionToDownload: 'latest'
       artifactName: 'drop'
-      targetPath: '$(Pipeline.Workspace)/drop'
+      targetPath: '$(Pipeline.Workspace)\drop'
     displayName: 'Download latest build artifact'
 
   # 2. Verify Chrome & ChromeDriver on the agent
-  - script: |
-      google-chrome --version
+  - powershell: |
+      & "C:\Program Files\Google\Chrome\Application\chrome.exe" --version
       chromedriver --version
     displayName: 'Check browser versions'
 
-  # 3. Run the test suite
-  - script: |
-      dotnet test $(Pipeline.Workspace)/drop/**/*.Tests.dll \
-        --logger trx \
-        --results-directory $(Agent.TempDirectory)/TestResults
-    displayName: 'Run Selenium Tests'
+  # 3. Run tests from test plan
+  - task: VSTest@3
+    inputs:
+      testSelector: 'testPlan'
+      testPlan: 84
+      testSuite: '94412, 93432, 89883'
+      testConfiguration: 1                          # ← adjust to your test configuration ID
+      searchFolder: '$(Pipeline.Workspace)\drop'
+      resultsFolder: '$(Agent.TempDirectory)\TestResults'
+      runInParallel: false
+      codeCoverageEnabled: false
+    displayName: 'Run Test Plan Suite'
 
   # 4. Always publish results, even on failure
   - task: PublishTestResults@2
     condition: always()
     inputs:
       testResultsFormat: 'VSTest'
-      testResultsFiles: '$(Agent.TempDirectory)/TestResults/**/*.trx'
+      testResultsFiles: '$(Agent.TempDirectory)\TestResults\**\*.trx'
       testRunTitle: 'Scheduled Selenium Suite'
