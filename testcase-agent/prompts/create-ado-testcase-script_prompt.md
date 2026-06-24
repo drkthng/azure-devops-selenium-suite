@@ -1,14 +1,15 @@
-Build a C# console application in a new tools/ado-importer/ folder that imports approved test cases from our out/ files into Azure DevOps as Test Case work items.
-Read these first, they define the mapping: style/testcase-schema.md (the exact structure of our test-case files — field names, and how steps are represented as action + optional-expected pairs) and one example file in out/. Derive the field mapping from these, do not assume a structure. The mapping is: title → System.Title; our steps → the Microsoft.VSTS.TCM.Steps XML field, where each step is a <step> with an action parameterizedString and an expectedResult parameterizedString only when our file specifies an expected result for that step — steps without one get an empty expectedResult; Area Path → System.AreaPath; our Source/Coverage info → a tag or the System.Description field, whichever fits the schema better.
-Configuration, not hardcoding: organization URL, project name, target Area Path, and the PAT must come from environment variables or a config file (e.g. appsettings.json that is git-ignored) — never hardcoded, never committed. The PAT is a secret. Read it from an environment variable.
-Authentication: authenticate to the Azure DevOps REST API using the PAT via basic auth (PAT as password, empty username, base64-encoded), or the Microsoft.TeamFoundationServer.Client SDK if you prefer — your call, but explain which you chose.
+Build a Python console script in a new tools/ado-importer/ folder that imports approved test cases from our out/ files into Azure DevOps as Test Case work items.
+Read these first, they define the mapping: style/testcase-schema.md (the exact structure of our test-case files — field names, and how steps are represented as action + optional-expected pairs) and one example file in out/. Derive the field mapping from these, do not assume a structure. The mapping is: title → System.Title; our steps → the Microsoft.VSTS.TCM.Steps field, which is an XML string where each step is a <step> element containing an action parameterizedString and an expectedResult parameterizedString only when our file specifies an expected result for that step — steps without one get an empty expectedResult; Area Path → System.AreaPath; our Source/Coverage info → a tag or System.Description, whichever fits the schema better. Build the Steps XML carefully and HTML-escape step text, since it goes inside XML inside JSON.
+Implementation: use the official azure-devops Python package if it installs cleanly; if pip cannot reach PyPI on this machine, stop and tell me before doing anything else — do not work around it. As a fallback only if I confirm, use the REST API directly via requests with a JSON-Patch (application/json-patch+json) call to the work-items create endpoint. State which path you took.
+Configuration, not hardcoding: organization URL, project name, and target Area Path come from a config file (e.g. a git-ignored config.json or a .env); the PAT comes from an environment variable only — never hardcoded, never written to any file, never committed. Add the config file and .env to .gitignore.
+Authentication: PAT via basic auth (empty username, PAT as password), or the SDK's PAT credential object if using the package.
 Safety behaviour, this is critical:
 
-Take the input file path as a command-line argument. Process only that one file.
-Support a --dry-run flag that parses the file and prints exactly what work items would be created (title, area path, step count) without calling the API. This must be the default if no write flag is given — never write unless explicitly told to.
-Before creating anything, print a summary and the target (org, project, area path) so the user can confirm they're pointing at the right place.
-On API errors, stop and report clearly — do not retry blindly in a way that could create duplicates.
-Echo the created work item IDs and URLs at the end so they can be checked in ADO.
+Take the input file path as a command-line argument (argparse). Process only that one file.
+--dry-run parses the file and prints exactly what would be created (title, area path, step count, which steps carry an expected result) without any API call. Dry-run is the default; require an explicit --create flag to actually write. Never write without it.
+Before creating, print the target — org, project, area path — and a summary, so I can confirm I'm pointed at the right place.
+On any API error, stop and report it clearly; do not retry in a loop that could create duplicates.
+Print the created work item IDs and URLs at the end so I can verify them in ADO.
 
-Do not add update, delete, or bulk-overwrite features. This tool only creates. Keep it minimal.
-After building it, show me how to run it: first a --dry-run on one out/ file, then the real create for a single test case so I can verify the field mapping in ADO before importing in volume.
+Do not add update, delete, or bulk-overwrite features. Create only. Keep it minimal and single-file if reasonable.
+After building it, show me the run commands: first --dry-run on one out/ file, then a single real create (--create) for one test case so I can verify the field mapping in ADO before importing in volume.
