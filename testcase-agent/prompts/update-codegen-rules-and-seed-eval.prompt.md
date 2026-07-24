@@ -1,0 +1,15 @@
+Three follow-up tasks on the matching/codegen rules session. Work through them in order and report at the end.
+
+Task 1 — Verification questions on your Phase 5 findings. Answer each precisely, referencing concrete ids/files:
+
+Availability: Did any written step in the walk-through match a base-step that was blocked by availability? If yes: which step, which base-step, which scope owns it — and would extending its availability (moving it up the inheritance chain or into a shared-step class) be a small change or a structural one? If no such conflict occurred, say so explicitly.
+Inventory: During the walk-through, did you encounter any method you expected in the inventory but didn't find, any purpose line that misled you, or any composes chain that didn't reflect the real code? List each with the id and what was wrong. If the inventory held up completely, say so explicitly.
+Coarseness: For each written step that landed in category 4 (composition) — did any of them recur in a pattern where a new shared step would have been the better answer? For each candidate: proposed name, which page-object calls it would wrap, and which written steps (from this and plausibly future test cases) would use it. If no candidates, say so explicitly.
+
+The "say so explicitly" matters: absence of findings is a finding — do not skip a question because the answer is empty.
+
+Task 2 — Amend one codegen rule. In style/codegen-rules.md, locate the framework-conformance rule forbidding creation of new helpers/shared steps. Replace it with this two-part rule: (a) generated working code uses only existing inventory steps — never invent helpers, shared steps, or page-object methods inline; (b) however, when you judge that a new helper or shared step would be advantageous (recurring composition, cleaner abstraction), propose it in the fenced proposal block at the end of the file: proposed signature, which page-object calls it wraps, and which written steps would use it. Such proposals count toward the max-3-per-file cap. Keep the wording consistent with the file's existing style.
+
+Task 3 — Seed the eval golden set. Create eval/golden/matching/ in this repo. From the Phase 5 walk-through table (as corrected by human review — the human-call decision is final), create one folder per written step: input.md containing the written step plus the relevant inventory excerpt it was matched against, and expected.md containing the confirmed category and matched id(s) or gap description. Also create a short eval/golden/matching/README.md stating what these pairs are for: reference data to test whether cheaper models can perform the matching step correctly. Do not include the human-call case's reasoning — just the decided outcome.
+
+Report: answers to Task 1 (including explicit "no findings" where true), the diff of the amended rule, and the list of golden pairs created.
