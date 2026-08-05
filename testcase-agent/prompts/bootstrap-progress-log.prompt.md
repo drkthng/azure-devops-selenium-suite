@@ -28,6 +28,11 @@ later session.
   answered>`.
 - Anything you inferred rather than knew or read, mark `[INFERRED: <basis>]`.
 - Never change this file silently — announce every change in your reply.
+- **Match length to substance.** This is a working file, not a report. No filler
+  sections, no redundant summaries, no stating the same fact in two places.
+- **Deliver exactly this scope.** Write the sections below and stop. Do not add
+  sections of your own, reorganise other files, or start on work that the log
+  merely records as open.
 
 **Phase 1 — Sweep.** Go over what is on disk and what you know about it, one
 line each: `style/*.md`, `prompts/` and `skills/`, each tool in `tools/` (what
