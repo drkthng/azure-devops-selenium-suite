@@ -92,6 +92,7 @@ Status reflects what exists on the customer machine, not what a document claims.
 | D4 | Locator discovery (DOM dump → agent picks locators) | not started — blocked on Q4 |
 | D5 | Metric snapshot for the weekly management update | not started — blocked on Q6 |
 | D6 | Model-tier / effort evals | not started — `eval/` is empty at the customer |
+| **Review** | Review HTML renderer (`tools/render-review-html`) — read-only view of `out/*.md` for the QA reviewers. Cross-phase, not a Phase 3 deliverable | prompt written (`build-review-html.prompt.md`), not run |
 
 ---
 
@@ -127,6 +128,11 @@ Ordered by what blocks what.
 7. **Define the `out/` ↔ ADO lifecycle after import.** Once a case is in ADO, ADO
    is the record; if a human edits it there, `out/` goes stale — and D3 generates
    code from `out/`. Decide which is the source of truth for codegen.
+8. **Run `build-review-html.prompt.md`.** Independent of everything above:
+   nothing here blocks it and it blocks nothing. Listed last for that reason, not
+   because it matters least — it is the only item that improves the review gate
+   itself, which every generated case passes through. Needs
+   `style/testcase-schema.md` and one real `out/` file, both of which exist.
 
 ---
 
@@ -144,9 +150,9 @@ Not urgent, but it degrades every time a prompt is added.
   `update-codegen-rules-and-seed-eval.prompt.md`. Valuable as the record of *why*
   rules are shaped as they are — but they read as runnable and two of them
   are not. An `archive/` subfolder would separate record from tooling.
-- **Naming convention** (verb-first, kebab-case, `.prompt.md`) holds for 7 of 12.
+- **Naming convention** (verb-first, kebab-case, `.prompt.md`) holds for 8 of 13.
 - **No `.github/prompts/` mirror exists**, so nothing here is slash-invocable;
-  only 3 of 12 files carry the `mode: agent` frontmatter that makes them so.
+  only 3 of 13 files carry the `mode: agent` frontmatter that makes them so.
   `skills/` is a third location not described anywhere.
 - **`copilot/` at repo root is an orphaned earlier generation.**
   `test-case-author.agent.md` is a screenshot/vision-based test-case author —
@@ -170,6 +176,8 @@ Append-only. A reversed decision gets a new entry naming the one it supersedes.
 | 2026-08-05 | Decision log is append-only; entries are never rewritten | Entries are historical facts. A file mixing mutable status with immutable history invites silent rewriting of the history |
 | 2026-08-05 | Bootstrap run of `PROGRESS.md`: Opus 5 at default effort | The hard part is restraint — refusing to invent rationale — not the file sweep. Tier-sensitive despite looking mechanical. `max` effort buys unneeded depth and raises scope-creep risk |
 | 2026-08-05 | Eval cost unit is the Copilot request multiplier, not tokens | The customer runs Copilot on credits; $/MTok is the wrong frame |
+| 2026-08-05 | Review output stays markdown; HTML is a generated read-only view, never an agent output | `out/*.md` is parsed by the ADO importer, read by D3 codegen, and tracked by git. Having the agent emit HTML would fuse the data contract with a presentation layer and fork the source of truth — the same problem §4.7 already flags for `out/` ↔ ADO. A script renders `review/*.html` on demand instead: zero tokens, repeatable, discardable, and re-runnable after every regeneration |
+| 2026-08-05 | Review HTML is viewer-only — no marking, commenting or editing in the browser | The reviewers are QA colleagues who would rather be handed a Word document, so skimming is the problem worth solving first. Deferred, not rejected: marks and comments need a stable per-case ID and belong in a sidecar (`out/<case>.review.json`), never in the `.md` the importer parses. Text edits stay in the `.md`, where git records them. The per-case ID is the same one §4.6 `pushed.jsonl` needs, so the two arrive together |
 
 ---
 
