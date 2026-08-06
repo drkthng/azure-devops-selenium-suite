@@ -1,6 +1,6 @@
 # Roadmap — AI-assisted test case & test code generation
 
-Living plan for this workstream. Last updated 2026-08-05.
+Living plan for this workstream. Last updated 2026-08-06.
 
 ---
 
@@ -92,7 +92,8 @@ Status reflects what exists on the customer machine, not what a document claims.
 | D4 | Locator discovery (DOM dump → agent picks locators) | not started — blocked on Q4 |
 | D5 | Metric snapshot for the weekly management update | not started — blocked on Q6 |
 | D6 | Model-tier / effort evals | not started — `eval/` is empty at the customer |
-| **Review** | Review HTML renderer (`tools/render-review-html`) — read-only view of `out/*.md` for the QA reviewers. Cross-phase, not a Phase 3 deliverable | prompt written (`build-review-html.prompt.md`), not run |
+| **R1** | Review HTML renderer (`tools/render-review-html`) — read-only view of `out/*.md` for the QA reviewers. Cross-phase, not a Phase 3 deliverable | **built** at the customer from `build-review-html.prompt.md`, per developer report. Not yet put in front of a reviewer |
+| **R2** | Review round trip — reviewer marks status and comments in the page, returns it as a file, `--ingest` writes `out/<case>.review.json` | prompt written (`extend-review-html-roundtrip.prompt.md`), not run — blocked on Q9 and Q10 |
 
 ---
 
@@ -128,11 +129,22 @@ Ordered by what blocks what.
 7. **Define the `out/` ↔ ADO lifecycle after import.** Once a case is in ADO, ADO
    is the record; if a human edits it there, `out/` goes stale — and D3 generates
    code from `out/`. Decide which is the source of truth for codegen.
-8. **Run `build-review-html.prompt.md`.** Independent of everything above:
-   nothing here blocks it and it blocks nothing. Listed last for that reason, not
-   because it matters least — it is the only item that improves the review gate
-   itself, which every generated case passes through. Needs
-   `style/testcase-schema.md` and one real `out/` file, both of which exist.
+8. **Check that an `.html` attachment survives the mail gateway** (Q9). Corporate
+   filters commonly strip or quarantine HTML attachments as a phishing vector,
+   and the return leg is where a scanner is most likely to object. Send any HTML
+   file to one QA colleague and confirm it arrives intact and runs its scripts
+   when opened. Costs nothing, and a negative answer invalidates the whole R2
+   design before it is built — the fallback is a Teams or SharePoint link rather
+   than an attachment.
+9. **Put the R1 view in front of two QA colleagues** (Q10). They asked for a Word
+   document; HTML is our compromise and they have not accepted it yet. Ask
+   whether they would rather mark up this page or a spreadsheet. If the answer is
+   spreadsheet, R2 is the wrong build and the effort belongs in an Excel round
+   trip instead.
+10. **Run `extend-review-html-roundtrip.prompt.md`** once 8 and 9 come back
+    positive. It extends the existing renderer rather than replacing it, and it
+    will stop and ask before touching `style/testcase-schema.md` for the stable
+    per-case id it needs.
 
 ---
 
@@ -150,9 +162,9 @@ Not urgent, but it degrades every time a prompt is added.
   `update-codegen-rules-and-seed-eval.prompt.md`. Valuable as the record of *why*
   rules are shaped as they are — but they read as runnable and two of them
   are not. An `archive/` subfolder would separate record from tooling.
-- **Naming convention** (verb-first, kebab-case, `.prompt.md`) holds for 8 of 13.
+- **Naming convention** (verb-first, kebab-case, `.prompt.md`) holds for 9 of 14.
 - **No `.github/prompts/` mirror exists**, so nothing here is slash-invocable;
-  only 3 of 13 files carry the `mode: agent` frontmatter that makes them so.
+  only 3 of 14 files carry the `mode: agent` frontmatter that makes them so.
   `skills/` is a third location not described anywhere.
 - **`copilot/` at repo root is an orphaned earlier generation.**
   `test-case-author.agent.md` is a screenshot/vision-based test-case author —
@@ -178,6 +190,8 @@ Append-only. A reversed decision gets a new entry naming the one it supersedes.
 | 2026-08-05 | Eval cost unit is the Copilot request multiplier, not tokens | The customer runs Copilot on credits; $/MTok is the wrong frame |
 | 2026-08-05 | Review output stays markdown; HTML is a generated read-only view, never an agent output | `out/*.md` is parsed by the ADO importer, read by D3 codegen, and tracked by git. Having the agent emit HTML would fuse the data contract with a presentation layer and fork the source of truth — the same problem §4.7 already flags for `out/` ↔ ADO. A script renders `review/*.html` on demand instead: zero tokens, repeatable, discardable, and re-runnable after every regeneration |
 | 2026-08-05 | Review HTML is viewer-only — no marking, commenting or editing in the browser | The reviewers are QA colleagues who would rather be handed a Word document, so skimming is the problem worth solving first. Deferred, not rejected: marks and comments need a stable per-case ID and belong in a sidecar (`out/<case>.review.json`), never in the `.md` the importer parses. Text edits stay in the `.md`, where git records them. The per-case ID is the same one §4.6 `pushed.jsonl` needs, so the two arrive together |
+| 2026-08-06 | Reviewer feedback comes back as the HTML file itself — the page rebuilds and downloads itself with the answers embedded | Ends the "viewer-only" deferral of 2026-08-05; the sidecar shape decided there survives, `--ingest` just produces it on arrival. There is no server and no shared folder, so the alternatives were a JSON export the reviewer has to handle, or a `mailto:` payload that exceeds URL limits. One file out, one file back is the only flow that asks nothing of the reviewer. It also reopens: they can pause mid-review, and we read their comments next to the steps they refer to instead of as raw JSON. Note the browser's own "Save page as" cannot do this — checkbox and textarea state lives in DOM properties, not markup, so it returns a complete-looking file containing none of their work |
+| 2026-08-06 | Reviewers set a status and write comments; they never edit case or step text in the browser | A rewritten step has to be merged back into `out/*.md` by hand, with no diff and no record of the original — and `out/*.md` is the authored record the importer parses and codegen reads. A comment naming the required change costs the reviewer the same typing and leaves the edit where git can see it. Status is three-way (ready / needs changes / not applicable) over a distinct *unreviewed* default, because a checkbox cannot separate "not looked at" from "rejected" |
 
 ---
 
@@ -193,6 +207,8 @@ unrecovered** — they predate that document; do not reuse their numbers.
 | Q6 | Which management metrics? Proposed: % steps auto-matched, time from approved case to compilable skeleton | D5 |
 | Q7 | Model tier defaults — provisional answers in §8 below, pending eval | D6 |
 | Q8 | Does Copilot expose reasoning effort as a knob, or only model choice? | Shape of the whole eval — see §8 |
+| Q9 | Does an `.html` attachment survive the customer's mail gateway in both directions, with scripts still running when opened? | R2 entirely — see §4.8 |
+| Q10 | Do the QA colleagues accept the HTML page as their review surface, or would they rather mark up a spreadsheet? | R2, and whether the review surface is HTML at all — see §4.9 |
 
 ---
 
