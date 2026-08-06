@@ -18,11 +18,24 @@ there, driven by an agent the developer works with directly.
 |---|---|---|
 | Roadmap, value research | ✅ | — |
 | Prompts (authoring + archive) | ✅ | invoked copies |
-| `knowledge/`, `style/`, `tools/`, `out/` | — | ✅ |
+| `knowledge/`, `style/`, `tools/`, `out/`, `review/` | — | ✅ |
 | `PROGRESS.md` (working state, decision log) | — | to be created |
 
 Divergence between the two is expected, not drift. This repo does not mirror
 the customer folder and should not try to.
+
+**Customer layout — every prompt must use these paths verbatim.** The working
+folder is not the repository root there; it sits one level down:
+
+```
+<repo root>/
+  testcase-agent/
+    knowledge/  style/  tools/  out/  review/  eval/
+```
+
+So it is `testcase-agent/out/`, never `out/`. Prompts are resolved against the
+repository root, and an unprefixed path sends the agent looking in the wrong
+place — this has already cost tokens on the customer side once. Answers Q5.
 
 ---
 
@@ -92,8 +105,8 @@ Status reflects what exists on the customer machine, not what a document claims.
 | D4 | Locator discovery (DOM dump → agent picks locators) | not started — blocked on Q4 |
 | D5 | Metric snapshot for the weekly management update | not started — blocked on Q6 |
 | D6 | Model-tier / effort evals | not started — `eval/` is empty at the customer |
-| **R1** | Review HTML renderer (`tools/render-review-html`) — read-only view of `out/*.md` for the QA reviewers. Cross-phase, not a Phase 3 deliverable | **built** at the customer from `build-review-html.prompt.md`, per developer report. Not yet put in front of a reviewer |
-| **R2** | Review round trip — reviewer marks status and comments in the page, returns it as a file, `--ingest` writes `out/<case>.review.json` | prompt written (`extend-review-html-roundtrip.prompt.md`), not run — blocked on Q9 and Q10 |
+| **R1** | Review HTML renderer (`testcase-agent/tools/render-review-html`) — reads `testcase-agent/out/*.md`, writes `testcase-agent/review/<case>.html`. Read-only view for the QA reviewers. Cross-phase, not a Phase 3 deliverable | **built** at the customer from `build-review-html.prompt.md`, per developer report. Not yet put in front of a reviewer |
+| **R2** | Review round trip — reviewer marks status and comments in the page, returns it as a file, `--ingest` writes `testcase-agent/out/<case>.review.json` | prompt written (`extend-review-html-roundtrip.prompt.md`), not run — blocked on Q9 and Q10 |
 
 ---
 
@@ -114,8 +127,10 @@ Ordered by what blocks what.
    folder has durable memory.
 3. **Pin the input paths in `generate-testcode.prompt.md`** before the first run.
    It currently names `step-inventory.json` with no directory, and the rule files
-   with no `style/` prefix. Q5 flags a wrong workspace as the most likely cause
-   of a confusing first failure — and this is the file about to run first.
+   with no `style/` prefix. Q5 is now answered (see §1): the prefix is
+   `testcase-agent/`, so these become `testcase-agent/tools/.../step-inventory.json`
+   and `testcase-agent/style/*.md`. This is the file about to run first, and the
+   same defect has already burned tokens on the review renderer.
 4. **Run D3 and diff its match table against the walk-through table.**
    Disagreements are the most informative signal available at this stage.
 5. **Rebuild `eval/golden/matching/`** from the (now corrected) walk-through
@@ -150,8 +165,16 @@ Ordered by what blocks what.
 
 ## 5. Prompt library hygiene (here)
 
-Not urgent, but it degrades every time a prompt is added.
+Not urgent, but it degrades every time a prompt is added — with one exception,
+listed first, which is already costing money.
 
+- **Most prompts name customer paths without the `testcase-agent/` prefix** —
+  22 occurrences across 11 files, `out/`, `style/`, `tools/`, `knowledge/`.
+  This is not cosmetic: it sent the customer agent looking in the wrong folder
+  and burned tokens on the review renderer before anyone noticed. Only
+  `build-review-html.prompt.md` and `extend-review-html-roundtrip.prompt.md`
+  are fixed. The rest should be swept, prioritising any prompt not yet run —
+  `generate-testcode.prompt.md` first, since it is next to run (§4.3).
 - **Three generations of the same prompt sit side by side, none marked current:**
   `analyze-work-instructions-prompt.md` (all instructions at once) →
   `scoped-testcase-creation-prompt.md` (one at a time) →
@@ -191,6 +214,8 @@ Append-only. A reversed decision gets a new entry naming the one it supersedes.
 | 2026-08-05 | Review output stays markdown; HTML is a generated read-only view, never an agent output | `out/*.md` is parsed by the ADO importer, read by D3 codegen, and tracked by git. Having the agent emit HTML would fuse the data contract with a presentation layer and fork the source of truth — the same problem §4.7 already flags for `out/` ↔ ADO. A script renders `review/*.html` on demand instead: zero tokens, repeatable, discardable, and re-runnable after every regeneration |
 | 2026-08-05 | Review HTML is viewer-only — no marking, commenting or editing in the browser | The reviewers are QA colleagues who would rather be handed a Word document, so skimming is the problem worth solving first. Deferred, not rejected: marks and comments need a stable per-case ID and belong in a sidecar (`out/<case>.review.json`), never in the `.md` the importer parses. Text edits stay in the `.md`, where git records them. The per-case ID is the same one §4.6 `pushed.jsonl` needs, so the two arrive together |
 | 2026-08-06 | Reviewer feedback comes back as the HTML file itself — the page rebuilds and downloads itself with the answers embedded | Ends the "viewer-only" deferral of 2026-08-05; the sidecar shape decided there survives, `--ingest` just produces it on arrival. There is no server and no shared folder, so the alternatives were a JSON export the reviewer has to handle, or a `mailto:` payload that exceeds URL limits. One file out, one file back is the only flow that asks nothing of the reviewer. It also reopens: they can pause mid-review, and we read their comments next to the steps they refer to instead of as raw JSON. Note the browser's own "Save page as" cannot do this — checkbox and textarea state lives in DOM properties, not markup, so it returns a complete-looking file containing none of their work |
+| 2026-08-06 | Prompts name customer paths in full from the repository root, always with the `testcase-agent/` prefix | The working folder is one level below the repository root at the customer, so a bare `out/` resolves to nothing and the agent goes hunting. That already happened on the review renderer and cost tokens. Writing `testcase-agent/out/` everywhere is redundant-looking and worth it: the prompt is read by an agent with no memory of this conversation, and a path is the cheapest thing in a prompt to get unambiguously right. Answers Q5 |
+| 2026-08-06 | The review sidecar lives in `testcase-agent/out/`, never in `testcase-agent/review/` | `review/` is regenerated on every render, so a sidecar there would be destroyed by the next run of the renderer that produced it. `out/` is durable and versioned, and a `.review.json` cannot collide with the `*.md` glob the renderer and importer use. Keeps the 2026-08-05 sidecar decision intact now that the output folder is known to be separate |
 | 2026-08-06 | Reviewers set a status and write comments; they never edit case or step text in the browser | A rewritten step has to be merged back into `out/*.md` by hand, with no diff and no record of the original — and `out/*.md` is the authored record the importer parses and codegen reads. A comment naming the required change costs the reviewer the same typing and leaves the edit where git can see it. Status is three-way (ready / needs changes / not applicable) over a distinct *unreviewed* default, because a checkbox cannot separate "not looked at" from "rejected" |
 
 ---
@@ -203,7 +228,7 @@ unrecovered** — they predate that document; do not reuse their numbers.
 | # | Question | Blocks |
 |---|---|---|
 | Q4 | Locator discovery mechanics — is Playwright MCP permitted by org policy? | D4 |
-| Q5 | Workspace-relative paths: which folder are prompts resolved against? | D3 first run |
+| Q5 | ~~Workspace-relative paths: which folder are prompts resolved against?~~ **Answered 2026-08-06:** the repository root, with the working folder at `testcase-agent/`. See §1 | was D3 first run |
 | Q6 | Which management metrics? Proposed: % steps auto-matched, time from approved case to compilable skeleton | D5 |
 | Q7 | Model tier defaults — provisional answers in §8 below, pending eval | D6 |
 | Q8 | Does Copilot expose reasoning effort as a knob, or only model choice? | Shape of the whole eval — see §8 |
