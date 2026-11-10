@@ -1,0 +1,8 @@
+<!-- Intentionally empty: stops MSBuild from importing the repo's Directory.Build.props
+     (analyzers, warnings-as-errors, central package management) into this standalone tool. -->
+<Project>
+  <PropertyGroup>
+    <ImportDirectoryPackagesProps>false</ImportDirectoryPackagesProps>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

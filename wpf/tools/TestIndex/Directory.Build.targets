@@ -1,0 +1,2 @@
+<!-- Intentionally empty: stops import of the repo's Directory.Build.targets. -->
+<Project />
