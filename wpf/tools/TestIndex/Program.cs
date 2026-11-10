@@ -28,6 +28,10 @@ public class Binding
     public int Used { get; set; }
     public string Mode { get; set; }
     [JsonIgnore] public Regex Rx { get; set; }
+    [JsonIgnore] public string Prefix { get; set; } = "";
+
+    public bool Matches(string kind, string text) =>
+        Rx != null && (Kind == kind || Kind == "any") && text.StartsWith(Prefix, StringComparison.Ordinal) && Rx.IsMatch(text);
 }
 
 public class IndexData
@@ -281,15 +285,41 @@ public static class Program
             try
             {
                 var (rx, mode) = ToRegex(b.Expr, transforms);
-                b.Rx = new Regex(rx, RegexOptions.CultureInvariant);
+                b.Rx = new Regex(rx, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
                 b.Mode = mode;
+                b.Prefix = LiteralFirstWord(b.Expr);
             }
             catch (ArgumentException) { b.Rx = null; b.Mode = "invalid"; }
         }
     }
 
-    static List<Binding> Match(List<Binding> bs, string kind, string text) =>
-        bs.Where(b => b.Rx != null && (b.Kind == kind || b.Kind == "any") && b.Rx.IsMatch(text)).ToList();
+    // First word of the pattern if it is plain literal text, else "" (no prefilter).
+    static string LiteralFirstWord(string expr)
+    {
+        var e = expr.StartsWith("^") ? expr.Substring(1) : expr;
+        var sb = new StringBuilder();
+        foreach (var c in e)
+        {
+            if (char.IsWhiteSpace(c)) return sb.ToString();
+            if ("{}()[]\\/^$.*+?|".IndexOf(c) >= 0) return "";
+            sb.Append(c);
+        }
+        return "";
+    }
+
+    static List<Binding> Match(List<Binding> bs, string kind, string text)
+    {
+        var hits = new List<Binding>();
+        foreach (var b in bs)
+        {
+            try { if (b.Matches(kind, text)) hits.Add(b); }
+            catch (RegexMatchTimeoutException) { Log($"regex timeout: {b.File}:{b.Line}"); }
+        }
+        return hits;
+    }
+
+    static readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();
+    static void Log(string msg) => Console.Error.WriteLine($"[testindex {Clock.Elapsed.TotalSeconds,6:0.0}s] {msg}");
 
     // ---------- Gherkin ----------
     public static List<Step> ParseFeature(string path)
@@ -370,18 +400,30 @@ public static class Program
     static IndexData Build(string root, string idx)
     {
         var data = new IndexData { Root = root };
+        Log($"indexing {root}");
+        int csFiles = 0;
         foreach (var p in Walk(root, ".cs"))
+        {
+            csFiles++;
             ScanCs(p, Path.GetRelativePath(root, p).Replace('\\', '/'), data.Bindings, data.Transforms);
+        }
+        Log($"{csFiles} .cs files scanned: {data.Bindings.Count} bindings, {data.Transforms.Count} transformations");
         Compile(data.Bindings, data.Transforms);
-        foreach (var p in Walk(root, ".feature"))
+        var features = Walk(root, ".feature").ToList();
+        Log($"matching steps of {features.Count} feature files for usage counts");
+        int steps = 0;
+        foreach (var p in features)
         {
             data.Features++;
             foreach (var s in ParseFeature(p))
             {
-                var hit = data.Bindings.FirstOrDefault(b => b.Rx != null && (b.Kind == s.Kind || b.Kind == "any") && b.Rx.IsMatch(s.Text));
+                steps++;
+                var hit = Match(data.Bindings, s.Kind, s.Text).FirstOrDefault();
                 if (hit != null) hit.Used++; else data.UnboundInExistingFeatures++;
             }
+            if (data.Features % 50 == 0) Log($"  {data.Features}/{features.Count} feature files, {steps} steps");
         }
+        Log($"done: {steps} steps, {data.UnboundInExistingFeatures} unbound");
         Directory.CreateDirectory(Path.GetDirectoryName(idx));
         System.IO.File.WriteAllText(idx, JsonSerializer.Serialize(data, Json));
         return data;

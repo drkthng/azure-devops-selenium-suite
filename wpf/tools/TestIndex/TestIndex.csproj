@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Deterministic Reqnroll/SpecFlow step index for agents. If net8.0 is not installed,
-       set TargetFramework to an installed SDK version (net6.0 or newer). -->
+  <!-- Deterministic Reqnroll/SpecFlow step index for agents. Targets the installed .NET 10 SDK;
+       change TargetFramework if a different SDK is installed. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <AssemblyName>testindex</AssemblyName>

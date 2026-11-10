@@ -30,7 +30,7 @@ and adjust `$proj` in `testindex.ps1`.
 ## 2. First run (in the repo root)
 
 ```powershell
-dotnet --list-sdks                # needs net6.0 or newer; adjust TargetFramework in the csproj if no 8.x
+dotnet --list-sdks                # csproj targets net10.0; adjust TargetFramework if needed
 .\tools\testindex.ps1 stats       # builds the tool on first use, then indexes the repo
 ```
 

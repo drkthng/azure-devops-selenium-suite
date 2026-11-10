@@ -16,6 +16,7 @@ if (-not $needBuild) {
         ($_.Extension -in '.cs', '.csproj', '.props', '.targets') -and $_.LastWriteTime -gt $exeTime })
 }
 if ($needBuild) {
+    Write-Host 'testindex: building tool (first run or sources changed)...'
     $log = & dotnet build $proj -c Release -o $out -nologo -v:q "-clp:ErrorsOnly;NoSummary" 2>&1
     if ($LASTEXITCODE -ne 0) { $log | Select-Object -First 20; exit $LASTEXITCODE }
 }
