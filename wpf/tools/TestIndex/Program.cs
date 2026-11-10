@@ -37,6 +37,7 @@ public class Binding
 public class IndexData
 {
     public string Root { get; set; }
+    public string Scan { get; set; }
     public int Features { get; set; }
     public int UnboundInExistingFeatures { get; set; }
     public Dictionary<string, string> Transforms { get; set; } = new();
@@ -49,6 +50,9 @@ public static class Program
 {
     static readonly HashSet<string> SkipDirs = new(StringComparer.OrdinalIgnoreCase)
         { "bin", "obj", "out", ".git", ".vs", ".idea", "node_modules", "packages", "TestResults", ".testindex" };
+
+    // Generated code never contains step bindings: Reqnroll code-behind, WPF/XAML, designer files.
+    static readonly string[] GeneratedSuffixes = { ".feature.cs", ".g.cs", ".g.i.cs", ".Designer.cs", ".AssemblyInfo.cs" };
 
     // @"verbatim" or "regular" C# string literal
     const string Str = @"(?:@""((?:[^""]|"""")*)""|""((?:[^""\\]|\\.)*)"")";
@@ -78,6 +82,9 @@ public static class Program
 
     static readonly JsonSerializerOptions Json = new() { WriteIndented = false, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+    // Folder that is scanned; paths in the output stay relative to --root.
+    static string ScanRoot;
+
     public static int Main(string[] argv)
     {
         Console.OutputEncoding = Encoding.UTF8;
@@ -86,6 +93,9 @@ public static class Program
         int ri = args.IndexOf("--root");
         if (ri >= 0 && ri + 1 < args.Count) { root = args[ri + 1]; args.RemoveRange(ri, 2); }
         root = Path.GetFullPath(root);
+        ScanRoot = root;
+        int si = args.IndexOf("--scan");
+        if (si >= 0 && si + 1 < args.Count) { ScanRoot = Path.GetFullPath(Path.Combine(root, args[si + 1])); args.RemoveRange(si, 2); }
         if (args.Count == 0) { Console.Error.WriteLine("usage: testindex [--root dir] build|find|check|stats ..."); return 2; }
         string idx = Path.Combine(root, ".testindex", "steps.json");
         string cmd = args[0];
@@ -393,23 +403,37 @@ public static class Program
             foreach (var f in files)
                 if (exts.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))) yield return f;
             foreach (var d in dirs)
-                if (!SkipDirs.Contains(Path.GetFileName(d))) stack.Push(d);
+            {
+                if (SkipDirs.Contains(Path.GetFileName(d))) continue;
+                // junctions/symlinks can loop forever or leave the repo
+                if ((System.IO.File.GetAttributes(d) & FileAttributes.ReparsePoint) != 0) continue;
+                stack.Push(d);
+            }
         }
     }
 
     static IndexData Build(string root, string idx)
     {
-        var data = new IndexData { Root = root };
-        Log($"indexing {root}");
+        var data = new IndexData { Root = root, Scan = ScanRoot };
+        Log($"indexing {ScanRoot}");
         int csFiles = 0;
-        foreach (var p in Walk(root, ".cs"))
+        var last = Clock.Elapsed;
+        foreach (var p in Walk(ScanRoot, ".cs"))
         {
             csFiles++;
-            ScanCs(p, Path.GetRelativePath(root, p).Replace('\\', '/'), data.Bindings, data.Transforms);
+            var rel = Path.GetRelativePath(root, p).Replace('\\', '/');
+            if (GeneratedSuffixes.Any(x => p.EndsWith(x, StringComparison.OrdinalIgnoreCase))) continue;
+            if (new FileInfo(p).Length > 1_000_000) { Log($"skipped (>1 MB, likely generated): {rel}"); continue; }
+            ScanCs(p, rel, data.Bindings, data.Transforms);
+            if ((Clock.Elapsed - last).TotalSeconds >= 2)
+            {
+                last = Clock.Elapsed;
+                Log($"  {csFiles} .cs files, {data.Bindings.Count} bindings, at {Path.GetDirectoryName(rel)}");
+            }
         }
         Log($"{csFiles} .cs files scanned: {data.Bindings.Count} bindings, {data.Transforms.Count} transformations");
         Compile(data.Bindings, data.Transforms);
-        var features = Walk(root, ".feature").ToList();
+        var features = Walk(ScanRoot, ".feature").ToList();
         Log($"matching steps of {features.Count} feature files for usage counts");
         int steps = 0;
         foreach (var p in features)
@@ -433,13 +457,14 @@ public static class Program
     {
         if (!System.IO.File.Exists(idx)) return true;
         var t = System.IO.File.GetLastWriteTimeUtc(idx);
-        return Walk(root, ".cs", ".feature").Any(p => System.IO.File.GetLastWriteTimeUtc(p) > t);
+        return Walk(ScanRoot, ".cs", ".feature").Any(p => System.IO.File.GetLastWriteTimeUtc(p) > t);
     }
 
     static IndexData Load(string root, string idx)
     {
         if (Stale(root, idx)) return Build(root, idx);
         var d = JsonSerializer.Deserialize<IndexData>(System.IO.File.ReadAllText(idx), Json);
+        if (!string.Equals(d.Scan, ScanRoot, StringComparison.OrdinalIgnoreCase)) return Build(root, idx);
         Compile(d.Bindings, d.Transforms);
         return d;
     }

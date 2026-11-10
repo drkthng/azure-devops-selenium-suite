@@ -21,5 +21,6 @@ if ($needBuild) {
     if ($LASTEXITCODE -ne 0) { $log | Select-Object -First 20; exit $LASTEXITCODE }
 }
 
-& $exe --root $repo @args
+# Only the test code is indexed; output paths stay relative to the repo root.
+& $exe --root $repo --scan 'Testing\NewSystemTests' @args
 exit $LASTEXITCODE
